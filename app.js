@@ -70,6 +70,10 @@ const els = {
   chatName: document.getElementById('chatName'),
   avatar: document.getElementById('avatar'),
   toast: document.getElementById('toast'),
+  settingsModal: document.getElementById('settingsModal'),
+  settingsCard: document.querySelector('.modal__card'),
+  openSettings: document.getElementById('openSettings'),
+  closeSettings: Array.from(document.querySelectorAll('[data-close-settings]')),
   chips: Array.from(document.querySelectorAll('.chip'))
 };
 
@@ -98,11 +102,22 @@ function init() {
   els.temperature.addEventListener('input', updateTemperatureLabel);
   els.charName.addEventListener('input', syncChatHeader);
 
+  els.openSettings.addEventListener('click', openSettingsPanel);
+  els.closeSettings.forEach((el) => el.addEventListener('click', closeSettingsPanel));
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !els.settingsModal.hidden) {
+      closeSettingsPanel();
+    }
+  });
+
   els.saveSettings.addEventListener('click', () => {
     persistKey();
     saveSettings();
     syncChatHeader();
+    closeSettingsPanel();
     toast('Settings saved.');
+    els.input.focus();
   });
 
   els.newChat.addEventListener('click', () => {
@@ -137,6 +152,29 @@ function init() {
 
   updateTemperatureLabel();
   syncChatHeader();
+}
+
+/* ============================================================
+ * Settings dialog
+ * ============================================================ */
+
+let lastFocusBeforeDialog = null;
+
+function openSettingsPanel() {
+  if (!els.settingsModal.hidden) return;
+  lastFocusBeforeDialog = document.activeElement;
+  els.settingsModal.hidden = false;
+  document.body.classList.add('is-locked');
+  els.settingsCard.focus({ preventScroll: true });
+}
+
+function closeSettingsPanel() {
+  if (els.settingsModal.hidden) return;
+  els.settingsModal.hidden = true;
+  document.body.classList.remove('is-locked');
+  if (lastFocusBeforeDialog && typeof lastFocusBeforeDialog.focus === 'function') {
+    lastFocusBeforeDialog.focus();
+  }
 }
 
 /* ============================================================
@@ -511,7 +549,7 @@ function clearMessages() {
   empty.className = 'empty';
   empty.id = 'emptyState';
   empty.innerHTML =
-    '<p>Describe the character on the left, then say hello.</p>' +
+    '<p>Open <strong>Settings</strong> to shape the character, then say hello.</p>' +
     '<p class="muted">Every reply is generated live by the DeepSeek API.</p>';
   els.messages.appendChild(empty);
   els.emptyState = empty;

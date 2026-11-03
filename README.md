@@ -8,7 +8,7 @@ No frameworks, no build step, no database. Four text files.
 
 ```
 virtual-lover-demo/
-├─ index.html    the page (settings panel + chat window)
+├─ index.html    the page (chat window + settings dialog)
 ├─ styles.css    the look (Wild Peony palette, all colors in :root)
 ├─ app.js        the logic (builds the character prompt, calls DeepSeek)
 ├─ server.py     optional: local web server + CORS-safe proxy
@@ -18,21 +18,23 @@ virtual-lover-demo/
 
 ---
 
-## 0. The theme — "Wild Peony"
+## 0. The theme — "Wild Peony", light pink
 
-The whole UI uses one 4-pair palette. Every color lives in the `:root` block at
-the top of `styles.css`, so the theme can be swapped in one place.
+A light theme: the page and panels are Petal White / Petal Blush, and the deep
+peony shades are reserved for text and accents. Every color lives in the
+`:root` block at the top of `styles.css`, so the theme can be swapped in one
+place.
 
 | Name | Hex | RGB | Used for |
 |---|---|---|---|
-| Dark Peony | `#4A0818` | 74, 8, 24 | page background, toast, input wells |
-| Deep Rose | `#780830` | 120, 8, 48 | panel tint, background glow |
+| Dark Peony | `#4A0818` | 74, 8, 24 | body text, dialog headings |
+| Deep Rose | `#780830` | 120, 8, 48 | muted text, secondary labels |
 | Peony Red | `#B01050` | 176, 16, 80 | bubble/button gradient start |
-| Vivid Peony | `#D84080` | 216, 64, 128 | primary accent, sliders, checkboxes |
-| Hot Pink | `#F070A8` | 240, 112, 168 | focus rings, borders, typing dot |
-| Pale Pink | `#F8A8CC` | 248, 168, 204 | muted text, gradients |
-| Petal Blush | `#FCD4E6` | 252, 212, 230 | assistant bubble text, surfaces |
-| Petal White | `#FFF0F6` | 255, 240, 246 | headings, primary text |
+| Vivid Peony | `#D84080` | 216, 64, 128 | primary accent, sliders, focus rings |
+| Hot Pink | `#F070A8` | 240, 112, 168 | gradients, avatar, background glow |
+| Pale Pink | `#F8A8CC` | 248, 168, 204 | page gradient, soft shadows |
+| Petal Blush | `#FCD4E6` | 252, 212, 230 | assistant bubbles, hover surfaces |
+| Petal White | `#FFF0F6` | 255, 240, 246 | page background, glass panels |
 
 ```css
 :root {
@@ -47,9 +49,9 @@ the top of `styles.css`, so the theme can be swapped in one place.
 }
 ```
 
-Contrast note: white text sits on the Peony Red → Vivid Peony gradient
-(≈ 4.9:1 to 6.9:1), and body text is Petal White on Dark Peony, which passes
-WCAG AA for normal text.
+Contrast note: body text is Dark Peony on near-white surfaces (≈ 15:1), and
+Petal White sits on the Peony Red → Vivid Peony bubble gradient (≈ 4.2:1 to
+6.9:1), which meets WCAG AA at the bubble's type size.
 
 ---
 
@@ -84,8 +86,9 @@ and only falls back to the local proxy if that fails. If you see
 2. **API keys → Create new API key**, copy it (`sk-...`). It is shown only once.
 3. **Top up the balance.** DeepSeek is prepaid; free trial credits expire. A 1–2 USD
    top-up is plenty for a demo (each reply here costs a fraction of a cent).
-4. Paste the key into the left panel of the website, tick **Remember on this device
-   only** if you want it to survive a refresh, and click **Save settings**.
+4. Paste the key into the **Settings** dialog (gear button, top right of the chat
+   header), tick **Remember on this device only** if you want it to survive a
+   refresh, and click **Save & close**.
 
 The key is stored in your browser's `localStorage`/`sessionStorage` only. It is
 sent to `api.deepseek.com` (or through `server.py` on your own machine) and
@@ -157,7 +160,7 @@ locally for the actual presentation and use GitHub as the code archive.
 
 ## 5. How the character is built
 
-`app.js` turns the left panel into one system prompt:
+`app.js` turns the settings dialog into one system prompt:
 
 ```
 You are <name>, a character in a live demo of a "virtual lover" chatbot.
@@ -192,7 +195,8 @@ Tuning knobs:
 
 ## 6. Suggested demo script (about 2 minutes)
 
-1. Show the settings panel: "it is just a name, three boxes of text and a slider".
+1. Click **Settings** and show the dialog: "it is just a name, three boxes of text
+   and a slider". Close it with `Esc` or the backdrop before you start typing.
 2. Switch the preset from *Gentle* to *Tsundere* and ask the same question twice —
    the same model, a different "person". This is your core argument: the
    personality is a prompt, not a soul.
