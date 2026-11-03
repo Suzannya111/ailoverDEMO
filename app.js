@@ -50,10 +50,12 @@ const PRESETS = {
 
 const els = {
   apiKey: document.getElementById('apiKey'),
-  rememberKey: document.getElementById('rememberKey'),
-  accessCode: document.getElementById('accessCode'),
-  accessCodeField: document.getElementById('accessCodeField'),
   serverKeyNote: document.getElementById('serverKeyNote'),
+  lockScreen: document.getElementById('lockScreen'),
+  lockForm: document.getElementById('lockForm'),
+  lockCode: document.getElementById('lockCode'),
+  lockSubmit: document.getElementById('lockSubmit'),
+  lockError: document.getElementById('lockError'),
   charName: document.getElementById('charName'),
   preset: document.getElementById('preset'),
   personality: document.getElementById('personality'),
@@ -111,10 +113,7 @@ function init() {
   // Save as the user types: leaving the field is enough, no extra click.
   els.apiKey.addEventListener('change', persistKey);
   els.apiKey.addEventListener('blur', persistKey);
-  if (els.accessCode) {
-    els.accessCode.addEventListener('change', persistAccessCode);
-    els.accessCode.addEventListener('blur', persistAccessCode);
-  }
+  els.lockForm.addEventListener('submit', handleUnlock);
 
   els.openSettings.addEventListener('click', openSettingsPanel);
   els.closeSettings.forEach((el) => el.addEventListener('click', closeSettingsPanel));
@@ -175,6 +174,10 @@ function init() {
 let lastFocusBeforeDialog = null;
 
 function openSettingsPanel() {
+  if (isLocked()) {
+    els.lockCode.focus();
+    return;
+  }
   if (!els.settingsModal.hidden) return;
   lastFocusBeforeDialog = document.activeElement;
   els.settingsModal.hidden = false;
@@ -215,10 +218,62 @@ async function loadServerConfig() {
     els.apiKey.placeholder = 'Using the server key (optional)';
   }
 
-  if (serverConfig.requiresCode && els.accessCodeField) {
-    els.accessCodeField.hidden = false;
-    if (els.accessCode) els.accessCode.value = loadAccessCode();
+  if (serverConfig.requiresCode) {
+    const saved = loadAccessCode();
+    const ok = saved ? await verifyAccessCode(saved).catch(() => false) : false;
+    if (ok) hideLockScreen();
+    else showLockScreen();
   }
+}
+
+/* ---------- access gate ---------- */
+
+function isLocked() {
+  return Boolean(els.lockScreen) && !els.lockScreen.hidden;
+}
+
+function showLockScreen() {
+  if (!els.lockScreen) return;
+  els.lockScreen.hidden = false;
+  els.lockError.hidden = true;
+  els.lockCode.value = '';
+  els.lockCode.focus();
+}
+
+function hideLockScreen() {
+  if (!els.lockScreen) return;
+  els.lockScreen.hidden = true;
+}
+
+async function verifyAccessCode(code) {
+  const response = await fetch('/api/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Access-Code': code },
+    body: '{}'
+  });
+  return response.ok;
+}
+
+async function handleUnlock(event) {
+  event.preventDefault();
+  const code = els.lockCode.value.trim();
+  if (!code) return;
+
+  els.lockSubmit.disabled = true;
+  els.lockError.hidden = true;
+  const ok = await verifyAccessCode(code).catch(() => false);
+  els.lockSubmit.disabled = false;
+
+  if (!ok) {
+    els.lockError.hidden = false;
+    els.lockCode.select();
+    return;
+  }
+
+  persistAccessCode(code);
+  hideLockScreen();
+  els.input.focus();
+  toast('Unlocked.');
 }
 
 function loadAccessCode() {
@@ -229,15 +284,19 @@ function loadAccessCode() {
   }
 }
 
-function persistAccessCode() {
-  const code = els.accessCode ? els.accessCode.value.trim() : '';
+function persistAccessCode(code) {
+  const value = String(code || '').trim();
   try {
-    if (code) localStorage.setItem(LS_ACCESS, code);
+    if (value) localStorage.setItem(LS_ACCESS, value);
     else localStorage.removeItem(LS_ACCESS);
   } catch (err) {
     /* private mode: the code just won't persist */
   }
-  return code;
+  return value;
+}
+
+function forgetAccessCode() {
+  persistAccessCode('');
 }
 
 /* ============================================================
@@ -307,18 +366,12 @@ function loadKey() {
 function persistKey() {
   const key = els.apiKey.value.trim();
   try {
-    if (els.rememberKey.checked && key) {
-      localStorage.setItem(LS_KEY, key);
-      sessionStorage.removeItem(LS_KEY);
-    } else if (key) {
-      sessionStorage.setItem(LS_KEY, key);
-      localStorage.removeItem(LS_KEY);
-    } else {
-      localStorage.removeItem(LS_KEY);
-      sessionStorage.removeItem(LS_KEY);
-    }
+    // Always permanent: a new key replaces the old one, clearing forgets it.
+    if (key) localStorage.setItem(LS_KEY, key);
+    else localStorage.removeItem(LS_KEY);
+    sessionStorage.removeItem(LS_KEY);
   } catch (err) {
-    /* ignore */
+    /* private mode: the key just won't persist */
   }
   return key;
 }
@@ -382,6 +435,11 @@ function buildSystemPrompt(settings) {
  * ============================================================ */
 
 function submitInput() {
+  if (isLocked()) {
+    showLockScreen();
+    return;
+  }
+
   const text = els.input.value.trim();
   if (!text) return;
   if (busy) return;
@@ -447,6 +505,11 @@ async function sendMessage(text, key) {
     history.push({ role: 'assistant', content: reply });
     saveHistory();
   } catch (err) {
+    if (err instanceof ApiError && err.status === 401 && /access code/i.test(err.message)) {
+      forgetAccessCode();
+      showLockScreen();
+    }
+
     // Drop the assistant placeholder and show a readable error instead.
     const holder = bubble.parentNode;
     if (holder) holder.classList.add('error');

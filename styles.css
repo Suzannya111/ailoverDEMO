@@ -525,13 +525,84 @@ hr {
   to   { opacity: 1; transform: none; }
 }
 
+/* ---------- access gate ---------- */
+
+.lock {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(700px 480px at 20% 0%, rgba(248, 168, 204, 0.85), transparent 62%),
+    radial-gradient(620px 520px at 100% 100%, rgba(240, 112, 168, 0.4), transparent 60%),
+    rgba(255, 240, 246, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.lock[hidden] { display: none; }
+
+.lock__card {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 10px;
+  padding: 26px 24px 22px;
+  text-align: center;
+  background: var(--surface-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(74, 8, 24, 0.24);
+  animation: pop 0.2s ease-out;
+}
+
+.lock__badge {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 2px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: var(--peony-white);
+  background: linear-gradient(135deg, var(--peony-red), var(--peony-hot));
+  box-shadow: 0 8px 18px rgba(216, 64, 128, 0.32);
+}
+
+.lock__card h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.2px;
+}
+
+.lock__sub {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.lock__card input {
+  text-align: center;
+  letter-spacing: 1.5px;
+}
+
+.lock__card .btn--primary { width: 100%; }
+
+.lock__error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--peony-red);
+}
+
 /* ---------- toast ---------- */
 
 .toast {
   position: fixed;
   left: 50%;
   bottom: 26px;
-  z-index: 70;
+  z-index: 90;
   transform: translate(-50%, 20px);
   padding: 10px 18px;
   max-width: 88vw;

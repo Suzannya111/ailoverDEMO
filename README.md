@@ -99,12 +99,18 @@ keep it on the server: set `DEEPSEEK_API_KEY` in the Render dashboard
 works. The page asks `/api/config` whether a server key exists and only shows
 the key field when it is actually needed.
 
-Optionally set `ACCESS_CODE` too: the site then asks once for a shared password
-and remembers it, so a stranger who finds the URL cannot spend your credits.
+### The access code
 
-Your typed key (when you do use one) lives in this browser's `localStorage`
-only, is sent to `api.deepseek.com` or your own proxy, and is **never written
-into any file**.
+The site is locked by default with the code **`suzanya`**. A visitor must type it
+once before the chat opens; the browser remembers it, so it is asked only once
+per device. Change it on Render with the `ACCESS_CODE` environment variable, or
+set that variable to an empty string to remove the gate. Since this repository is
+public, treat the code as a polite barrier rather than a real password.
+
+A typed API key is stored **permanently** in this browser's `localStorage`:
+leaving the field saves it, typing a new key replaces the old one, and clearing
+the field forgets it. It is sent to `api.deepseek.com` or your own proxy and is
+**never written into any file**.
 
 ---
 
@@ -188,7 +194,7 @@ origin and CORS stops being a problem.
 | Key | Value |
 |---|---|
 | `DEEPSEEK_API_KEY` | your `sk-...` key |
-| `ACCESS_CODE` | optional shared password for the site |
+| `ACCESS_CODE` | optional; defaults to `suzanya`, set empty to disable |
 
 Redeploy, then open the URL on any device — no key field, no copy-paste. The key
 never reaches the browser and is never committed; `render.yaml` marks both

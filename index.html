@@ -53,6 +53,25 @@
     </main>
   </div>
 
+  <!-- ---------------- access gate ---------------- -->
+  <div id="lockScreen" class="lock" hidden>
+    <form id="lockForm" class="lock__card" autocomplete="off">
+      <div class="lock__badge" aria-hidden="true">✿</div>
+      <h2>Private demo</h2>
+      <p class="lock__sub">Enter the access code to open the chat.</p>
+      <input
+        id="lockCode"
+        type="password"
+        placeholder="Access code"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Access code"
+      >
+      <button id="lockSubmit" class="btn btn--primary" type="submit">Unlock</button>
+      <p id="lockError" class="lock__error" role="alert" hidden>That code is not right. Try again.</p>
+    </form>
+  </div>
+
   <!-- ---------------- settings dialog ---------------- -->
   <div id="settingsModal" class="modal" hidden>
     <div class="modal__backdrop" data-close-settings></div>
@@ -76,18 +95,11 @@
         <div class="field">
           <label for="apiKey">DeepSeek API key</label>
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
-          <label class="check">
-            <input id="rememberKey" type="checkbox" checked>
-            <span>Save this key on this device</span>
-          </label>
           <p class="hint" id="serverKeyNote" hidden></p>
-          <p class="hint">Saved automatically in this browser and sent only to DeepSeek.</p>
-        </div>
-
-        <div class="field" id="accessCodeField" hidden>
-          <label for="accessCode">Access code</label>
-          <input id="accessCode" type="password" autocomplete="off" spellcheck="false">
-          <p class="hint">This deployment is protected. Ask the owner for the code; it is remembered here.</p>
+          <p class="hint">
+            Saved permanently in this browser as soon as you leave the field. Typing a new
+            key replaces the old one; clearing the field forgets it.
+          </p>
         </div>
 
         <hr>

@@ -15,6 +15,7 @@ the app to listen on 0.0.0.0, which this script does automatically.
 Requires Python 3.8+. No third-party packages.
 """
 
+import hmac
 import json
 import os
 import sys
@@ -28,9 +29,10 @@ UPSTREAM = "https://api.deepseek.com/chat/completions"
 # Optional server-side key: set this on Render (or in your shell) and the page
 # works on every device without anyone typing a key. Never commit it.
 SERVER_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-# Optional shared code: set ACCESS_CODE to stop strangers from spending the
-# server key. The browser asks for it once and remembers it.
-ACCESS_CODE = os.environ.get("ACCESS_CODE", "").strip()
+# Shared code that gates the whole site, so strangers cannot spend the server
+# key. Defaults to "suzanya"; override with the ACCESS_CODE env var, or set it
+# to an empty string to disable the gate.
+ACCESS_CODE = os.environ.get("ACCESS_CODE", "suzanya").strip()
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -47,17 +49,22 @@ class Handler(SimpleHTTPRequestHandler):
             return
         super().do_GET()
 
-    # ---- POST /api/chat ------------------------------------------------
+    # ---- POST /api/chat and /api/verify --------------------------------
     def do_POST(self):
-        if self.path.split("?")[0] != "/api/chat":
+        path = self.path.split("?")[0]
+        if path not in ("/api/chat", "/api/verify"):
             self.send_error(404, "Not found")
             return
 
         if ACCESS_CODE:
             provided = (self.headers.get("X-Access-Code") or "").strip()
-            if provided != ACCESS_CODE:
+            if not hmac.compare_digest(provided, ACCESS_CODE):
                 self._send_json(401, {"error": {"message": "Wrong access code."}})
                 return
+
+        if path == "/api/verify":
+            self._send_json(200, {"ok": True})
+            return
 
         key = (self.headers.get("X-DeepSeek-Key") or "").strip() or SERVER_API_KEY
         if not key:
