@@ -1,0 +1,22 @@
+# Render Blueprint for the Virtual Lover demo.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# server.py serves the static files AND proxies POST /api/chat to DeepSeek,
+# so the page and the API call share one origin and CORS never comes up.
+# The API key is typed into the browser at runtime; nothing secret is stored here.
+
+services:
+  - type: web
+    name: virtual-lover-demo
+    runtime: python
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: echo "No build step - static files and server.py only"
+    startCommand: python server.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: HOST
+        value: 0.0.0.0

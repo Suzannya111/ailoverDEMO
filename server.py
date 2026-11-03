@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local server for the Virtual Lover demo.
+"""Local/Render server for the Virtual Lover demo.
 
 Serves the static files in this folder and proxies POST /api/chat to the
 DeepSeek API, so the browser never has to deal with CORS. The API key is
@@ -8,6 +8,9 @@ sent per request in the X-DeepSeek-Key header and is never stored here.
 Usage:
     python server.py            # http://127.0.0.1:8000
     python server.py 9000       # custom port
+
+On a PaaS (Render, Railway, Fly.io, ...) the platform injects PORT and expects
+the app to listen on 0.0.0.0, which this script does automatically.
 
 Requires Python 3.8+. No third-party packages.
 """
@@ -92,7 +95,17 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
+    env_port = os.environ.get("PORT")
+    # Locally we stay on loopback; on Render (PORT is set) we must bind 0.0.0.0.
+    host = os.environ.get("HOST") or ("0.0.0.0" if env_port else "127.0.0.1")
+
     port = 8000
+    if env_port:
+        try:
+            port = int(env_port)
+        except ValueError:
+            print("PORT must be a number, got %r" % env_port)
+            return 1
     if len(sys.argv) > 1:
         try:
             port = int(sys.argv[1])
@@ -101,8 +114,8 @@ def main():
             return 1
 
     os.chdir(ROOT)
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print("Virtual Lover demo running at http://127.0.0.1:%d" % port)
+    httpd = ThreadingHTTPServer((host, port), Handler)
+    print("Virtual Lover demo running at http://%s:%d" % (host, port))
     print("Press Ctrl+C to stop.")
     try:
         httpd.serve_forever()

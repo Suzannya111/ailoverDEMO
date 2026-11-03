@@ -11,8 +11,10 @@ virtual-lover-demo/
 ├─ index.html    the page (chat window + settings dialog)
 ├─ styles.css    the look (Wild Peony palette, all colors in :root)
 ├─ app.js        the logic (builds the character prompt, calls DeepSeek)
-├─ server.py     optional: local web server + CORS-safe proxy
+├─ server.py     web server + same-origin proxy to DeepSeek (local and Render)
+├─ render.yaml   Render Blueprint: one free Python web service
 ├─ .gitignore    keeps secrets (_keytest.py, .env) out of git
+├─ .gitattributes  keeps text files LF in the repo
 └─ README.md     this file
 ```
 
@@ -97,10 +99,10 @@ without leaking it.
 
 ---
 
-## 3. What else you have to do (besides "uploading")
+## 3. What else you have to do
 
-Nothing needs *hosting*. This is meant to run from your laptop during the
-presentation. The real checklist:
+It runs from your laptop (`python server.py`) or free on Render (section 5).
+The real checklist:
 
 | # | Task | Why |
 |---|------|-----|
@@ -166,7 +168,32 @@ locally for the actual presentation and use GitHub as the code archive.
 
 ---
 
-## 5. How the character is built
+## 5. Deploy on Render
+
+Render runs exactly the same `server.py`, so the page and `/api/chat` share one
+origin and CORS stops being a problem. The API key is still typed by hand in the
+Settings dialog and never stored on the server.
+
+**Blueprint route (what `render.yaml` is for):**
+
+1. Push `render.yaml` to `main` (done).
+2. In Render: **New → Blueprint**, connect `Suzannya111/ailoverDEMO`, apply.
+3. Render reads [`render.yaml`](render.yaml:1), creates the `virtual-lover-demo`
+   web service, runs `python server.py`, and health-checks `/`.
+4. Open the `onrender.com` URL it gives you. First build takes a couple of
+   minutes; the free plan sleeps after inactivity, so the first request is slow.
+
+**Manual route (no blueprint):** **New → Web Service** → same repo →
+Runtime **Python** → Build Command `echo "no build"` → Start Command
+`python server.py`.
+
+`server.py` binds to `0.0.0.0:$PORT` whenever Render sets `PORT`, and stays on
+`127.0.0.1:8000` locally. If a build fails on the pinned interpreter, delete the
+`PYTHON_VERSION` entry — any Python 3.8+ works.
+
+---
+
+## 6. How the character is built
 
 `app.js` turns the settings dialog into one system prompt:
 
@@ -201,7 +228,7 @@ Tuning knobs:
 
 ---
 
-## 6. Suggested demo script (about 2 minutes)
+## 7. Suggested demo script (about 2 minutes)
 
 1. Click **Settings** and show the dialog: "it is just a name, three boxes of text
    and a slider". Close it with `Esc` or the backdrop before you start typing.
@@ -216,7 +243,7 @@ Tuning knobs:
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Message | Meaning | Fix |
 |---|---|---|

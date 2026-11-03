@@ -401,19 +401,30 @@ async function sendMessage(text, key) {
  * Transport: try the API directly, fall back to the local proxy.
  * ------------------------------------------------------------ */
 
-class ApiError extends Error {}
+class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
 
 async function requestChat(payload, key) {
-  const targets = [
-    {
-      url: DIRECT_URL,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
-    },
-    {
-      url: PROXY_URL,
-      headers: { 'Content-Type': 'application/json', 'X-DeepSeek-Key': key }
-    }
-  ];
+  const direct = {
+    url: DIRECT_URL,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
+  };
+  const proxy = {
+    url: PROXY_URL,
+    headers: { 'Content-Type': 'application/json', 'X-DeepSeek-Key': key }
+  };
+
+  // Locally, try DeepSeek directly first. When the page is hosted (Render,
+  // GitHub Pages, ...) the same-origin proxy is the reliable path, so try it
+  // first and avoid a guaranteed CORS failure.
+  const localHosts = ['localhost', '127.0.0.1', '[::1]', ''];
+  const preferDirect = location.protocol === 'file:' || localHosts.includes(location.hostname);
+  const targets = preferDirect ? [direct, proxy] : [proxy, direct];
 
   let lastError = null;
 
@@ -426,12 +437,16 @@ async function requestChat(payload, key) {
       });
 
       if (!response.ok) {
-        throw new ApiError(await explainError(response));
+        throw new ApiError(await explainError(response), response.status);
       }
       return response;
     } catch (err) {
-      // Real API problems (bad key, no balance) must not be retried.
-      if (err instanceof ApiError) throw err;
+      // Real API problems (bad key, no balance) must not be retried. A 404/405
+      // just means this origin has no proxy route (e.g. GitHub Pages), so the
+      // next target is worth trying.
+      if (err instanceof ApiError && err.status !== 404 && err.status !== 405) {
+        throw err;
+      }
       lastError = err;
     }
   }
