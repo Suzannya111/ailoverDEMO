@@ -116,39 +116,47 @@ presentation. The real checklist:
 
 ## 4. Upload it to GitHub
 
-The folder is already a git repository with one commit on `main`.
+The project lives at
+<https://github.com/Suzannya111/ailoverDEMO> and is already published.
+
+Clone it:
+
+```bash
+git clone https://github.com/Suzannya111/ailoverDEMO.git
+```
+
+Everyday changes:
+
+```bash
+git add -A
+git commit -m "describe the change"
+git push
+```
+
+To point a fresh copy at the same repo:
 
 ```bash
 git init -b main
 git add .
 git commit -m "Virtual Lover demo - Wild Peony theme"
-```
-
-Create a **new empty** repository on GitHub (no README, no license, no
-`.gitignore` — otherwise the first push is rejected), then connect and push:
-
-```bash
-git remote add origin https://github.com/<your-username>/virtual-lover-demo.git
+git remote add origin https://github.com/Suzannya111/ailoverDEMO.git
 git push -u origin main
 ```
 
-If you prefer SSH later:
+### What gets committed
 
-```bash
-git remote set-url origin git@github.com:<your-username>/virtual-lover-demo.git
-```
+`.gitignore` excludes `_keytest.py`, `.env` and similar files that could contain
+a key. **Never commit an API key.** The app asks for the key in the browser at
+runtime and stores it in `localStorage`, so the public repo stays clean.
 
-### What gets uploaded
-
-`.gitignore` already excludes `_keytest.py`, `.env` and similar files that could
-contain a key. **Never commit an API key.** The app asks for the key in the
-browser at runtime and stores it in `localStorage`, so the public repo stays
-clean.
+An early upload did include `_keytest.py`. It has since been deleted *and*
+purged from every commit, but the key it contained must be treated as leaked —
+revoke it at <https://platform.deepseek.com> and create a new one.
 
 ### GitHub Pages (optional)
 
 Settings → Pages → Source: *Deploy from a branch* → `main` / `(root)`. The site
-then appears at `https://<your-username>.github.io/virtual-lover-demo/`.
+then appears at <https://suzannya111.github.io/ailoverDEMO/>.
 
 The **interface** works there, but chatting usually does not: DeepSeek does not
 send CORS headers that a page on another origin is allowed to use, so the
