@@ -1,0 +1,23 @@
+# --- secrets: never commit these ---
+_keytest.py
+.env
+.env.*
+*.key
+secrets.*
+keytest*.py
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- logs ---
+*.log

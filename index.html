@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#4a0818">
+  <meta name="description" content="A tiny virtual-lover chatbot demo for a speaking test, built with a dependency-free HTML/CSS/JS front end and the DeepSeek API.">
+  <title>Virtual Lover — Speaking Test Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ---------------- left: character settings ---------------- -->
+    <aside class="panel panel--settings" aria-label="Character settings">
+      <header class="brand">
+        <h1>Virtual<span>Lover</span></h1>
+        <p class="tagline">A tiny character bot for a speaking-test presentation.</p>
+      </header>
+
+      <div class="field">
+        <label for="apiKey">DeepSeek API key</label>
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+        <label class="check">
+          <input id="rememberKey" type="checkbox">
+          <span>Remember on this device only</span>
+        </label>
+        <p class="hint">The key stays in your browser. It is sent only to DeepSeek.</p>
+      </div>
+
+      <hr>
+
+      <div class="field">
+        <label for="charName">Character name</label>
+        <input id="charName" type="text" value="Aria" maxlength="24">
+      </div>
+
+      <div class="field">
+        <label for="preset">Personality preset</label>
+        <select id="preset">
+          <option value="gentle">Gentle & attentive</option>
+          <option value="tsundere">Tsundere</option>
+          <option value="rational">Calm & rational</option>
+          <option value="playful">Playful & teasing</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="personality">Personality</label>
+        <textarea id="personality" rows="3" maxlength="600"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="style">Speaking style</label>
+        <textarea id="style" rows="2" maxlength="400"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="backstory">Backstory / relationship</label>
+        <textarea id="backstory" rows="3" maxlength="600"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="temperature">Warmth (temperature) <output id="temperatureValue">0.8</output></label>
+        <input id="temperature" type="range" min="0" max="1.5" step="0.1" value="0.8">
+      </div>
+
+      <label class="check">
+        <input id="streaming" type="checkbox" checked>
+        <span>Typing effect (streaming)</span>
+      </label>
+
+      <div class="actions">
+        <button id="saveSettings" class="btn" type="button">Save settings</button>
+        <button id="newChat" class="btn btn--ghost" type="button">New conversation</button>
+      </div>
+      <button id="downloadTranscript" class="btn btn--ghost btn--wide" type="button">
+        Download transcript (.txt)
+      </button>
+    </aside>
+
+    <!-- ---------------- right: chat ---------------- -->
+    <main class="panel panel--chat">
+      <header class="chat-header">
+        <div class="avatar" id="avatar" aria-hidden="true">A</div>
+        <div class="who">
+          <strong id="chatName">Aria</strong>
+          <span id="status" class="status">ready</span>
+        </div>
+      </header>
+
+      <div id="messages" class="messages" aria-live="polite">
+        <div class="empty" id="emptyState">
+          <p>Describe the character on the left, then say hello.</p>
+          <p class="muted">Every reply is generated live by the DeepSeek API.</p>
+        </div>
+      </div>
+
+      <div class="chips">
+        <button class="chip" type="button" data-prompt="Hey, how was your day?">Hey, how was your day?</button>
+        <button class="chip" type="button" data-prompt="Do you actually love me?">Do you actually love me?</button>
+        <button class="chip" type="button" data-prompt="Wait - are you a real person?">Are you a real person?</button>
+      </div>
+
+      <form id="composer" class="composer">
+        <textarea id="input" rows="1" placeholder="Type a message… (Enter to send, Shift+Enter for a new line)" maxlength="2000"></textarea>
+        <button id="send" class="btn btn--primary" type="submit">Send</button>
+      </form>
+      <p class="disclaimer">Demo for a school presentation: the "lover" is a language model playing a role, not a person.</p>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
