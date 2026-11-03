@@ -57,8 +57,8 @@
   <div id="lockScreen" class="lock" hidden>
     <form id="lockForm" class="lock__card" autocomplete="off">
       <div class="lock__badge" aria-hidden="true">✿</div>
-      <h2>Private demo</h2>
-      <p class="lock__sub">Enter the access code to open the chat.</p>
+      <h2>Access code</h2>
+      <p class="lock__sub">Enter the code to change the shared API key.</p>
       <input
         id="lockCode"
         type="password"
@@ -95,10 +95,11 @@
         <div class="field">
           <label for="apiKey">DeepSeek API key</label>
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+          <button id="saveKey" class="btn" type="button">Save key for everyone</button>
           <p class="hint" id="serverKeyNote" hidden></p>
           <p class="hint">
-            Saved permanently in this browser as soon as you leave the field. Typing a new
-            key replaces the old one; clearing the field forgets it.
+            One shared key powers the demo: save it once here and every device can chat
+            without typing it. Changing it asks for the access code.
           </p>
         </div>
 

@@ -50,6 +50,7 @@ const PRESETS = {
 
 const els = {
   apiKey: document.getElementById('apiKey'),
+  saveKey: document.getElementById('saveKey'),
   serverKeyNote: document.getElementById('serverKeyNote'),
   lockScreen: document.getElementById('lockScreen'),
   lockForm: document.getElementById('lockForm'),
@@ -113,7 +114,8 @@ function init() {
   // Save as the user types: leaving the field is enough, no extra click.
   els.apiKey.addEventListener('change', persistKey);
   els.apiKey.addEventListener('blur', persistKey);
-  els.lockForm.addEventListener('submit', handleUnlock);
+  els.saveKey.addEventListener('click', handleSaveKeyClick);
+  els.lockForm.addEventListener('submit', handleCodeSubmit);
 
   els.openSettings.addEventListener('click', openSettingsPanel);
   els.closeSettings.forEach((el) => el.addEventListener('click', closeSettingsPanel));
@@ -174,10 +176,6 @@ function init() {
 let lastFocusBeforeDialog = null;
 
 function openSettingsPanel() {
-  if (isLocked()) {
-    els.lockCode.focus();
-    return;
-  }
   if (!els.settingsModal.hidden) return;
   lastFocusBeforeDialog = document.activeElement;
   els.settingsModal.hidden = false;
@@ -195,7 +193,7 @@ function closeSettingsPanel() {
 }
 
 /* ============================================================
- * Server key + access code
+ * Shared key stored on the server
  * ============================================================ */
 
 async function loadServerConfig() {
@@ -211,33 +209,113 @@ async function loadServerConfig() {
     return; // opened as a file, or no server: local key only
   }
 
-  if (serverConfig.hasServerKey && els.serverKeyNote) {
-    els.serverKeyNote.hidden = false;
-    els.serverKeyNote.textContent =
-      'This site already has a key on the server, so you can leave this blank on any device.';
-    els.apiKey.placeholder = 'Using the server key (optional)';
-  }
-
-  if (serverConfig.requiresCode) {
-    const saved = loadAccessCode();
-    const ok = saved ? await verifyAccessCode(saved).catch(() => false) : false;
-    if (ok) hideLockScreen();
-    else showLockScreen();
+  if (serverConfig.hasServerKey) {
+    // Everyone shares the server key, so a stale local copy is pointless.
+    forgetLocalKey();
+    els.apiKey.value = '';
+    els.apiKey.placeholder = 'A shared key is set on the server';
+    setServerKeyNote(
+      'A shared key is stored on the server, so no device has to type one. Type a new key and press "Save key for everyone" to replace it — that asks for the access code.'
+    );
+  } else {
+    setServerKeyNote(
+      'No shared key yet. Paste a DeepSeek key and press "Save key for everyone" so every device can chat without it.'
+    );
   }
 }
 
-/* ---------- access gate ---------- */
-
-function isLocked() {
-  return Boolean(els.lockScreen) && !els.lockScreen.hidden;
+function setServerKeyNote(text) {
+  if (!els.serverKeyNote) return;
+  els.serverKeyNote.hidden = false;
+  els.serverKeyNote.textContent = text;
 }
 
-function showLockScreen() {
-  if (!els.lockScreen) return;
-  els.lockScreen.hidden = false;
+function forgetLocalKey() {
+  try {
+    localStorage.removeItem(LS_KEY);
+    sessionStorage.removeItem(LS_KEY);
+  } catch (err) {
+    /* ignore */
+  }
+}
+
+/* ---------- changing the shared key ---------- */
+
+function handleSaveKeyClick() {
+  if (!els.apiKey.value.trim()) {
+    toast('Type a DeepSeek API key first.');
+    els.apiKey.focus();
+    return;
+  }
+
+  if (!serverConfig.requiresCode) {
+    finishKeySave('');
+    return;
+  }
+
   els.lockError.hidden = true;
-  els.lockCode.value = '';
+  els.lockCode.value = loadAccessCode();
+  els.lockScreen.hidden = false;
   els.lockCode.focus();
+  els.lockCode.select();
+}
+
+async function handleCodeSubmit(event) {
+  event.preventDefault();
+  const code = els.lockCode.value.trim();
+  if (!code) return;
+  finishKeySave(code);
+}
+
+async function finishKeySave(code) {
+  els.lockSubmit.disabled = true;
+  els.lockError.hidden = true;
+
+  const response = await saveSharedKey(code);
+  els.lockSubmit.disabled = false;
+
+  if (!response) {
+    showKeyError('Could not reach the server. Try again.');
+    return;
+  }
+
+  if (response.status === 401) {
+    showKeyError('That code is not right. Try again.');
+    els.lockCode.select();
+    return;
+  }
+
+  if (!response.ok) {
+    showKeyError(await readServerError(response));
+    return;
+  }
+
+  persistAccessCode(code);
+  serverConfig.hasServerKey = true;
+  els.apiKey.value = '';
+  els.apiKey.placeholder = 'A shared key is set on the server';
+  forgetLocalKey();
+  setServerKeyNote('Shared key saved. Every device now chats with it — nothing to type.');
+  hideLockScreen();
+  toast('Shared key saved for every device.');
+}
+
+function saveSharedKey(code) {
+  const key = els.apiKey.value.trim();
+  return fetch('/api/key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Access-Code': code },
+    body: JSON.stringify({ apiKey: key })
+  }).catch(() => null);
+}
+
+async function readServerError(response) {
+  try {
+    const body = await response.json();
+    return (body && body.error && body.error.message) || 'The server rejected that key.';
+  } catch (err) {
+    return 'The server rejected that key (HTTP ' + response.status + ').';
+  }
 }
 
 function hideLockScreen() {
@@ -245,35 +323,13 @@ function hideLockScreen() {
   els.lockScreen.hidden = true;
 }
 
-async function verifyAccessCode(code) {
-  const response = await fetch('/api/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Access-Code': code },
-    body: '{}'
-  });
-  return response.ok;
-}
-
-async function handleUnlock(event) {
-  event.preventDefault();
-  const code = els.lockCode.value.trim();
-  if (!code) return;
-
-  els.lockSubmit.disabled = true;
-  els.lockError.hidden = true;
-  const ok = await verifyAccessCode(code).catch(() => false);
-  els.lockSubmit.disabled = false;
-
-  if (!ok) {
+function showKeyError(message) {
+  if (els.lockScreen && !els.lockScreen.hidden) {
+    els.lockError.textContent = message;
     els.lockError.hidden = false;
-    els.lockCode.select();
-    return;
+  } else {
+    toast(message);
   }
-
-  persistAccessCode(code);
-  hideLockScreen();
-  els.input.focus();
-  toast('Unlocked.');
 }
 
 function loadAccessCode() {
@@ -293,10 +349,6 @@ function persistAccessCode(code) {
     /* private mode: the code just won't persist */
   }
   return value;
-}
-
-function forgetAccessCode() {
-  persistAccessCode('');
 }
 
 /* ============================================================
@@ -435,11 +487,6 @@ function buildSystemPrompt(settings) {
  * ============================================================ */
 
 function submitInput() {
-  if (isLocked()) {
-    showLockScreen();
-    return;
-  }
-
   const text = els.input.value.trim();
   if (!text) return;
   if (busy) return;
@@ -505,11 +552,6 @@ async function sendMessage(text, key) {
     history.push({ role: 'assistant', content: reply });
     saveHistory();
   } catch (err) {
-    if (err instanceof ApiError && err.status === 401 && /access code/i.test(err.message)) {
-      forgetAccessCode();
-      showLockScreen();
-    }
-
     // Drop the assistant placeholder and show a readable error instead.
     const holder = bubble.parentNode;
     if (holder) holder.classList.add('error');
@@ -536,11 +578,8 @@ class ApiError extends Error {
 }
 
 async function requestChat(payload, key) {
-  const code = loadAccessCode();
-
   const proxyHeaders = { 'Content-Type': 'application/json' };
   if (key) proxyHeaders['X-DeepSeek-Key'] = key;
-  if (code) proxyHeaders['X-Access-Code'] = code;
 
   const proxy = { url: PROXY_URL, headers: proxyHeaders };
   const direct = key

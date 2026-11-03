@@ -88,29 +88,37 @@ and only falls back to the local proxy if that fails. If you see
 2. **API keys → Create new API key**, copy it (`sk-...`). It is shown only once.
 3. **Top up the balance.** DeepSeek is prepaid; free trial credits expire. A 1–2 USD
    top-up is plenty for a demo (each reply here costs a fraction of a cent).
-4. Paste it into **Settings** (gear button, top right). It is saved the moment you
-   leave the field — no extra click, no checkbox to remember.
+4. Open **Settings** (gear button, top right), paste the key and press
+   **Save key for everyone**.
 
-### Using it on every device without typing anything
+### One key for every device
 
-Browser storage is per device, so the only way to skip the key entirely is to
-keep it on the server: set `DEEPSEEK_API_KEY` in the Render dashboard
-(**Environment**), redeploy, and every phone or laptop that opens the URL just
-works. The page asks `/api/config` whether a server key exists and only shows
-the key field when it is actually needed.
+The key is stored **on the server**, not in the browser, so whoever opens the
+site on any phone or laptop chats immediately — no pasting, no copy-paste during
+the test. Two storage places, in priority order:
+
+| Priority | Where | Survives |
+|---|---|---|
+| 1 | `DEEPSEEK_API_KEY` environment variable | redeploys, restarts |
+| 2 | `.secrets/api_key.json`, written by **Save key for everyone** | while the instance lives |
+
+On Render's free tier the disk is ephemeral, so a key saved through the page can
+disappear after a redeploy or a long sleep. Set `DEEPSEEK_API_KEY` in the
+dashboard if you want it to survive; otherwise press the button again after a
+restart. The saved file is never served over HTTP, never committed (`.secrets/`
+is git-ignored), and the browser only receives a `hasServerKey` boolean from
+`/api/config`.
 
 ### The access code
 
-The site is locked by default with the code **`suzanya`**. A visitor must type it
-once before the chat opens; the browser remembers it, so it is asked only once
-per device. Change it on Render with the `ACCESS_CODE` environment variable, or
-set that variable to an empty string to remove the gate. Since this repository is
+The code **`suzanya`** is asked for only when someone **changes the key** — the
+chat itself opens without it. Override it with the `ACCESS_CODE` environment
+variable, or set that variable empty to skip the check. Since this repository is
 public, treat the code as a polite barrier rather than a real password.
 
-A typed API key is stored **permanently** in this browser's `localStorage`:
-leaving the field saves it, typing a new key replaces the old one, and clearing
-the field forgets it. It is sent to `api.deepseek.com` or your own proxy and is
-**never written into any file**.
+A key typed into the browser is only a fallback for setups with no server
+(opened as a file): it is saved in `localStorage` for that device and never
+uploaded.
 
 ---
 
@@ -188,13 +196,17 @@ locally for the actual presentation and use GitHub as the code archive.
 Render runs exactly the same `server.py`, so the page and `/api/chat` share one
 origin and CORS stops being a problem.
 
-**Put the key on the server once** (recommended): Render → your service →
-**Environment → Add Environment Variable**:
+Two ways to set the shared key:
+
+1. **From the site (no dashboard):** open the URL, Settings → paste key →
+   **Save key for everyone** → enter `suzanya`. Every device now uses it.
+2. **Environment variable (survives restarts):** Render → your service →
+   **Environment → Add Environment Variable**:
 
 | Key | Value |
 |---|---|
 | `DEEPSEEK_API_KEY` | your `sk-...` key |
-| `ACCESS_CODE` | optional; defaults to `suzanya`, set empty to disable |
+| `ACCESS_CODE` | optional; defaults to `suzanya`, only used to change the key |
 
 Redeploy, then open the URL on any device — no key field, no copy-paste. The key
 never reaches the browser and is never committed; `render.yaml` marks both
@@ -274,7 +286,8 @@ Tuning knobs:
 | Message | Meaning | Fix |
 |---|---|---|
 | Add your DeepSeek API key… | key field empty and no server key | paste the key, Save settings |
-| That access code was rejected (401) | `ACCESS_CODE` set on Render | ask the owner for the code, enter it in Settings |
+| That code is not right | wrong access code when saving the key | the default code is `suzanya` |
+| No shared key yet (400) | nothing saved on the server | paste a key in Settings, press **Save key for everyone** |
 | API key rejected (401) | wrong/incomplete/revoked key | re-copy the whole key |
 | Balance is empty (402) | no credit | top up on platform.deepseek.com |
 | Too many requests (429) | sending too fast | wait a few seconds |

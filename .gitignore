@@ -1,5 +1,7 @@
 # --- secrets: never commit these ---
 _keytest.py
+.secrets/
+data/key.json
 .env
 .env.*
 *.key

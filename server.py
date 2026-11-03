@@ -2,8 +2,13 @@
 """Local/Render server for the Virtual Lover demo.
 
 Serves the static files in this folder and proxies POST /api/chat to the
-DeepSeek API, so the browser never has to deal with CORS. The API key is
-sent per request in the X-DeepSeek-Key header and is never stored here.
+DeepSeek API, so the browser never has to deal with CORS.
+
+The API key can live on the server so that every visitor shares it:
+  * DEEPSEEK_API_KEY (environment) wins if set, and survives restarts;
+  * otherwise POST /api/key saves one to .secrets/api_key.json, guarded by the
+    access code, until the next restart/redeploy.
+A key typed in the browser is only a per-device fallback.
 
 Usage:
     python server.py            # http://127.0.0.1:8000
@@ -29,49 +34,115 @@ UPSTREAM = "https://api.deepseek.com/chat/completions"
 # Optional server-side key: set this on Render (or in your shell) and the page
 # works on every device without anyone typing a key. Never commit it.
 SERVER_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-# Shared code that gates the whole site, so strangers cannot spend the server
-# key. Defaults to "suzanya"; override with the ACCESS_CODE env var, or set it
-# to an empty string to disable the gate.
+# Code required to CHANGE the shared key (not to open the site). Defaults to
+# "suzanya"; override with ACCESS_CODE, or set it empty to disable the check.
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "suzanya").strip()
+
+# Key saved from the website, guarded by ACCESS_CODE. Kept out of git.
+SECRET_DIR = os.path.join(ROOT, ".secrets")
+SECRET_FILE = os.path.join(SECRET_DIR, "api_key.json")
+
+
+def read_saved_key():
+    """Return the key saved through the website, or "" if there is none."""
+    try:
+        with open(SECRET_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return str(data.get("apiKey", "")).strip()
+    except Exception:
+        return ""
+
+
+def write_saved_key(key):
+    """Persist the shared key atomically, readable only by this user."""
+    os.makedirs(SECRET_DIR, exist_ok=True)
+    tmp = SECRET_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump({"apiKey": key}, fh)
+    os.replace(tmp, SECRET_FILE)
+    try:
+        os.chmod(SECRET_FILE, 0o600)
+    except OSError:
+        pass
+
+
+def effective_key():
+    """Environment key first, then the one saved from the site."""
+    return SERVER_API_KEY or read_saved_key()
 
 
 class Handler(SimpleHTTPRequestHandler):
     server_version = "VirtualLoverDemo/1.0"
+
+    # ---- never serve the saved secret ----------------------------------
+    def send_head(self):
+        if self.path.split("?")[0].startswith("/.secrets"):
+            self.send_error(404, "Not found")
+            return None
+        return super().send_head()
 
     # ---- GET /api/config -----------------------------------------------
     def do_GET(self):
         if self.path.split("?")[0] == "/api/config":
             # Booleans only: the key itself never leaves the server.
             self._send_json(200, {
-                "hasServerKey": bool(SERVER_API_KEY),
+                "hasServerKey": bool(effective_key()),
                 "requiresCode": bool(ACCESS_CODE),
             })
             return
         super().do_GET()
 
-    # ---- POST /api/chat and /api/verify --------------------------------
+    # ---- POST /api/chat, /api/key, /api/verify --------------------------
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/api/chat", "/api/verify"):
+        if path not in ("/api/chat", "/api/key", "/api/verify"):
             self.send_error(404, "Not found")
             return
 
-        if ACCESS_CODE:
-            provided = (self.headers.get("X-Access-Code") or "").strip()
-            if not hmac.compare_digest(provided, ACCESS_CODE):
-                self._send_json(401, {"error": {"message": "Wrong access code."}})
-                return
+        provided = (self.headers.get("X-Access-Code") or "").strip()
+        code_ok = bool(ACCESS_CODE) and hmac.compare_digest(provided, ACCESS_CODE)
 
         if path == "/api/verify":
+            if ACCESS_CODE and not code_ok:
+                self._send_json(401, {"error": {"message": "Wrong access code."}})
+                return
             self._send_json(200, {"ok": True})
             return
 
-        key = (self.headers.get("X-DeepSeek-Key") or "").strip() or SERVER_API_KEY
+        if path == "/api/key":
+            if ACCESS_CODE and not code_ok:
+                self._send_json(401, {"error": {"message": "Wrong access code."}})
+                return
+
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = 0
+            raw = self.rfile.read(length) if length > 0 else b"{}"
+            try:
+                new_key = str(json.loads(raw.decode("utf-8")).get("apiKey", "")).strip()
+            except Exception:
+                self._send_json(400, {"error": {"message": 'Send {"apiKey": "sk-..."}'}})
+                return
+
+            if not new_key:
+                self._send_json(400, {"error": {"message": "The API key is empty."}})
+                return
+
+            try:
+                write_saved_key(new_key)
+            except Exception as exc:  # noqa: BLE001 - report and continue
+                self._send_json(500, {"error": {"message": "Could not save the key: %s" % exc}})
+                return
+            self._send_json(200, {"ok": True, "hasServerKey": True})
+            return
+
+        key = (self.headers.get("X-DeepSeek-Key") or "").strip() or effective_key()
         if not key:
             self._send_json(400, {
                 "error": {
-                    "message": "No API key. Add one in Settings, or set DEEPSEEK_API_KEY "
-                    "on the server."
+                    "message": "No shared key yet. Open Settings, paste a key and press "
+                    "\"Save key for everyone\"."
                 }
             })
             return
