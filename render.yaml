@@ -20,3 +20,11 @@ services:
         value: 3.12.6
       - key: HOST
         value: 0.0.0.0
+      # Set these two in the Render dashboard (Environment). They are marked
+      # sync:false so no secret is ever stored in this repository.
+      #   DEEPSEEK_API_KEY -> the shared key every device will use
+      #   ACCESS_CODE      -> optional shared password for the site
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: ACCESS_CODE
+        sync: false

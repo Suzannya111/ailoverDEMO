@@ -77,10 +77,17 @@
           <label for="apiKey">DeepSeek API key</label>
           <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
           <label class="check">
-            <input id="rememberKey" type="checkbox">
-            <span>Remember on this device only</span>
+            <input id="rememberKey" type="checkbox" checked>
+            <span>Save this key on this device</span>
           </label>
-          <p class="hint">The key stays in your browser. It is sent only to DeepSeek.</p>
+          <p class="hint" id="serverKeyNote" hidden></p>
+          <p class="hint">Saved automatically in this browser and sent only to DeepSeek.</p>
+        </div>
+
+        <div class="field" id="accessCodeField" hidden>
+          <label for="accessCode">Access code</label>
+          <input id="accessCode" type="password" autocomplete="off" spellcheck="false">
+          <p class="hint">This deployment is protected. Ask the owner for the code; it is remembered here.</p>
         </div>
 
         <hr>

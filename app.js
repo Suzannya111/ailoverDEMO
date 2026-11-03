@@ -15,6 +15,7 @@ const MODEL = 'deepseek-chat';
 const LS_KEY = 'vl.apiKey';
 const LS_SETTINGS = 'vl.settings';
 const LS_HISTORY = 'vl.history';
+const LS_ACCESS = 'vl.accessCode';
 
 const MAX_HISTORY_TURNS = 20;           // messages sent per request
 const MAX_REPLY_TOKENS = 400;
@@ -50,6 +51,9 @@ const PRESETS = {
 const els = {
   apiKey: document.getElementById('apiKey'),
   rememberKey: document.getElementById('rememberKey'),
+  accessCode: document.getElementById('accessCode'),
+  accessCodeField: document.getElementById('accessCodeField'),
+  serverKeyNote: document.getElementById('serverKeyNote'),
   charName: document.getElementById('charName'),
   preset: document.getElementById('preset'),
   personality: document.getElementById('personality'),
@@ -82,6 +86,7 @@ const els = {
 let history = [];        // [{ role: 'user' | 'assistant', content: string }]
 let busy = false;
 let toastTimer = null;
+let serverConfig = { hasServerKey: false, requiresCode: false };
 
 /* ============================================================
  * Boot
@@ -93,6 +98,7 @@ function init() {
   loadSettings();
   loadKey();
   loadHistory();
+  loadServerConfig();
 
   els.preset.addEventListener('change', () => {
     const preset = PRESETS[els.preset.value];
@@ -101,6 +107,14 @@ function init() {
 
   els.temperature.addEventListener('input', updateTemperatureLabel);
   els.charName.addEventListener('input', syncChatHeader);
+
+  // Save as the user types: leaving the field is enough, no extra click.
+  els.apiKey.addEventListener('change', persistKey);
+  els.apiKey.addEventListener('blur', persistKey);
+  if (els.accessCode) {
+    els.accessCode.addEventListener('change', persistAccessCode);
+    els.accessCode.addEventListener('blur', persistAccessCode);
+  }
 
   els.openSettings.addEventListener('click', openSettingsPanel);
   els.closeSettings.forEach((el) => el.addEventListener('click', closeSettingsPanel));
@@ -178,6 +192,55 @@ function closeSettingsPanel() {
 }
 
 /* ============================================================
+ * Server key + access code
+ * ============================================================ */
+
+async function loadServerConfig() {
+  try {
+    const response = await fetch('/api/config', { headers: { Accept: 'application/json' } });
+    if (!response.ok) return;
+    const config = await response.json();
+    serverConfig = {
+      hasServerKey: Boolean(config && config.hasServerKey),
+      requiresCode: Boolean(config && config.requiresCode)
+    };
+  } catch (err) {
+    return; // opened as a file, or no server: local key only
+  }
+
+  if (serverConfig.hasServerKey && els.serverKeyNote) {
+    els.serverKeyNote.hidden = false;
+    els.serverKeyNote.textContent =
+      'This site already has a key on the server, so you can leave this blank on any device.';
+    els.apiKey.placeholder = 'Using the server key (optional)';
+  }
+
+  if (serverConfig.requiresCode && els.accessCodeField) {
+    els.accessCodeField.hidden = false;
+    if (els.accessCode) els.accessCode.value = loadAccessCode();
+  }
+}
+
+function loadAccessCode() {
+  try {
+    return localStorage.getItem(LS_ACCESS) || '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function persistAccessCode() {
+  const code = els.accessCode ? els.accessCode.value.trim() : '';
+  try {
+    if (code) localStorage.setItem(LS_ACCESS, code);
+    else localStorage.removeItem(LS_ACCESS);
+  } catch (err) {
+    /* private mode: the code just won't persist */
+  }
+  return code;
+}
+
+/* ============================================================
  * Settings persistence
  * ============================================================ */
 
@@ -238,7 +301,6 @@ function loadKey() {
   }
   if (stored) {
     els.apiKey.value = stored;
-    els.rememberKey.checked = !!localStorage.getItem(LS_KEY);
   }
 }
 
@@ -325,8 +387,9 @@ function submitInput() {
   if (busy) return;
 
   const key = persistKey();
-  if (!key) {
-    toast('Add your DeepSeek API key in the left panel first.');
+  if (!key && !serverConfig.hasServerKey) {
+    toast('Add a DeepSeek API key in Settings.');
+    openSettingsPanel();
     els.apiKey.focus();
     return;
   }
@@ -410,21 +473,27 @@ class ApiError extends Error {
 }
 
 async function requestChat(payload, key) {
-  const direct = {
-    url: DIRECT_URL,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
-  };
-  const proxy = {
-    url: PROXY_URL,
-    headers: { 'Content-Type': 'application/json', 'X-DeepSeek-Key': key }
-  };
+  const code = loadAccessCode();
+
+  const proxyHeaders = { 'Content-Type': 'application/json' };
+  if (key) proxyHeaders['X-DeepSeek-Key'] = key;
+  if (code) proxyHeaders['X-Access-Code'] = code;
+
+  const proxy = { url: PROXY_URL, headers: proxyHeaders };
+  const direct = key
+    ? {
+        url: DIRECT_URL,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
+      }
+    : null;
 
   // Locally, try DeepSeek directly first. When the page is hosted (Render,
   // GitHub Pages, ...) the same-origin proxy is the reliable path, so try it
-  // first and avoid a guaranteed CORS failure.
+  // first and avoid a guaranteed CORS failure. Without a personal key there is
+  // nothing to try directly: the key lives on the server.
   const localHosts = ['localhost', '127.0.0.1', '[::1]', ''];
   const preferDirect = location.protocol === 'file:' || localHosts.includes(location.hostname);
-  const targets = preferDirect ? [direct, proxy] : [proxy, direct];
+  const targets = (preferDirect ? [direct, proxy] : [proxy, direct]).filter(Boolean);
 
   let lastError = null;
 
@@ -472,6 +541,12 @@ async function explainError(response) {
     case 400:
       return `The request was rejected (400). ${detail}`;
     case 401:
+      if (/access code/i.test(detail)) {
+        return 'That access code was rejected (401). Open Settings and check it.';
+      }
+      if (/key/i.test(detail) && !/api key/i.test(detail)) {
+        return `The server rejected the request (401). ${detail}`;
+      }
       return 'Your API key was rejected (401). Check that the whole key was pasted and that it is still active.';
     case 402:
       return 'Your DeepSeek balance is empty (402). Top up the account, then try again.';

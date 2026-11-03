@@ -25,9 +25,27 @@ from urllib import request as urlrequest
 ROOT = os.path.dirname(os.path.abspath(__file__))
 UPSTREAM = "https://api.deepseek.com/chat/completions"
 
+# Optional server-side key: set this on Render (or in your shell) and the page
+# works on every device without anyone typing a key. Never commit it.
+SERVER_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+# Optional shared code: set ACCESS_CODE to stop strangers from spending the
+# server key. The browser asks for it once and remembers it.
+ACCESS_CODE = os.environ.get("ACCESS_CODE", "").strip()
+
 
 class Handler(SimpleHTTPRequestHandler):
     server_version = "VirtualLoverDemo/1.0"
+
+    # ---- GET /api/config -----------------------------------------------
+    def do_GET(self):
+        if self.path.split("?")[0] == "/api/config":
+            # Booleans only: the key itself never leaves the server.
+            self._send_json(200, {
+                "hasServerKey": bool(SERVER_API_KEY),
+                "requiresCode": bool(ACCESS_CODE),
+            })
+            return
+        super().do_GET()
 
     # ---- POST /api/chat ------------------------------------------------
     def do_POST(self):
@@ -35,9 +53,20 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404, "Not found")
             return
 
-        key = (self.headers.get("X-DeepSeek-Key") or "").strip()
+        if ACCESS_CODE:
+            provided = (self.headers.get("X-Access-Code") or "").strip()
+            if provided != ACCESS_CODE:
+                self._send_json(401, {"error": {"message": "Wrong access code."}})
+                return
+
+        key = (self.headers.get("X-DeepSeek-Key") or "").strip() or SERVER_API_KEY
         if not key:
-            self._send_json(400, {"error": {"message": "Missing X-DeepSeek-Key header."}})
+            self._send_json(400, {
+                "error": {
+                    "message": "No API key. Add one in Settings, or set DEEPSEEK_API_KEY "
+                    "on the server."
+                }
+            })
             return
 
         try:

@@ -88,14 +88,23 @@ and only falls back to the local proxy if that fails. If you see
 2. **API keys → Create new API key**, copy it (`sk-...`). It is shown only once.
 3. **Top up the balance.** DeepSeek is prepaid; free trial credits expire. A 1–2 USD
    top-up is plenty for a demo (each reply here costs a fraction of a cent).
-4. Paste the key into the **Settings** dialog (gear button, top right of the chat
-   header), tick **Remember on this device only** if you want it to survive a
-   refresh, and click **Save & close**.
+4. Paste it into **Settings** (gear button, top right). It is saved the moment you
+   leave the field — no extra click, no checkbox to remember.
 
-The key is stored in your browser's `localStorage`/`sessionStorage` only. It is
-sent to `api.deepseek.com` (or through `server.py` on your own machine) and
-nowhere else. **It is never written into any file**, so you can share this folder
-without leaking it.
+### Using it on every device without typing anything
+
+Browser storage is per device, so the only way to skip the key entirely is to
+keep it on the server: set `DEEPSEEK_API_KEY` in the Render dashboard
+(**Environment**), redeploy, and every phone or laptop that opens the URL just
+works. The page asks `/api/config` whether a server key exists and only shows
+the key field when it is actually needed.
+
+Optionally set `ACCESS_CODE` too: the site then asks once for a shared password
+and remembers it, so a stranger who finds the URL cannot spend your credits.
+
+Your typed key (when you do use one) lives in this browser's `localStorage`
+only, is sent to `api.deepseek.com` or your own proxy, and is **never written
+into any file**.
 
 ---
 
@@ -171,8 +180,19 @@ locally for the actual presentation and use GitHub as the code archive.
 ## 5. Deploy on Render
 
 Render runs exactly the same `server.py`, so the page and `/api/chat` share one
-origin and CORS stops being a problem. The API key is still typed by hand in the
-Settings dialog and never stored on the server.
+origin and CORS stops being a problem.
+
+**Put the key on the server once** (recommended): Render → your service →
+**Environment → Add Environment Variable**:
+
+| Key | Value |
+|---|---|
+| `DEEPSEEK_API_KEY` | your `sk-...` key |
+| `ACCESS_CODE` | optional shared password for the site |
+
+Redeploy, then open the URL on any device — no key field, no copy-paste. The key
+never reaches the browser and is never committed; `render.yaml` marks both
+variables `sync: false` so Render keeps them only in its dashboard.
 
 **Blueprint route (what `render.yaml` is for):**
 
@@ -247,7 +267,8 @@ Tuning knobs:
 
 | Message | Meaning | Fix |
 |---|---|---|
-| Add your DeepSeek API key… | key field empty | paste the key, Save settings |
+| Add your DeepSeek API key… | key field empty and no server key | paste the key, Save settings |
+| That access code was rejected (401) | `ACCESS_CODE` set on Render | ask the owner for the code, enter it in Settings |
 | API key rejected (401) | wrong/incomplete/revoked key | re-copy the whole key |
 | Balance is empty (402) | no credit | top up on platform.deepseek.com |
 | Too many requests (429) | sending too fast | wait a few seconds |
